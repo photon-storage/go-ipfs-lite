@@ -10,7 +10,6 @@ import (
 
 	"github.com/photon-storage/go-common/log"
 	"github.com/photon-storage/go-common/testing/require"
-	"github.com/photon-storage/go-photon/testing/wait"
 
 	ipfs "github.com/photon-storage/go-ipfs-lite"
 )
@@ -61,24 +60,28 @@ func TestNodePutGetRoundtrip(t *testing.T) {
 	fmt.Printf("local peer fetched object successfully, content = %v\n", string(data))
 
 	// Get object through external source.
-	wait.ForCond(
-		t,
-		ctx,
-		func() bool {
+	tk := time.NewTicker(10 * time.Millisecond)
+	defer tk.Stop()
+
+	for {
+		select {
+		case <-tk.C:
 			data, err := ipfs.ExternFetchCid(cid)
 			if err != nil {
 				fmt.Printf("error fetching object from external source: %v\n", err)
 				time.Sleep(10 * time.Second)
-				return false
+				break
 			}
 
 			if content != string(data) {
 				fmt.Printf("object data from external source mismatch: %v\n", string(data))
 				time.Sleep(10 * time.Second)
-				return false
+				break
 			}
+			return
 
-			return true
-		},
-	)
+		case <-ctx.Done():
+			require.Fail(t, "Expected data not fetched before deadline")
+		}
+	}
 }

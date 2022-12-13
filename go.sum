@@ -228,6 +228,7 @@ github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9/go.mod h1:cIg4er
 github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
 github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
 github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da h1:oI5xCqsCo564l8iNU+DwB5epxmsaqB+rhGL0m5jtYqE=
+github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
 github.com/golang/lint v0.0.0-20180702182130-06c8688daad7/go.mod h1:tluoj9z5200jBnyusfRPU2LqT6J+DAorxEvtC7LHB+E=
 github.com/golang/mock v1.1.1/go.mod h1:oTYuIxOrZwtPieC+H1uAHpcLFnEyAGVDL/k47Jfbm0A=
 github.com/golang/mock v1.2.0/go.mod h1:oTYuIxOrZwtPieC+H1uAHpcLFnEyAGVDL/k47Jfbm0A=
@@ -924,8 +925,6 @@ github.com/photon-storage/fastssz v0.0.0-20220401135229-47aa49fe839f h1:9665mStR
 github.com/photon-storage/fastssz v0.0.0-20220401135229-47aa49fe839f/go.mod h1:Hmk4z6NsD9YtCrJE1P1BL6hQ3pWVuCzRE9oL7FMs/C0=
 github.com/photon-storage/go-common v0.0.0-20221201055738-384fda0f66a0 h1:+7oHA81sQ1f0YAFdnd2wElAQn8Yvq/7r1auXfxYO8Jg=
 github.com/photon-storage/go-common v0.0.0-20221201055738-384fda0f66a0/go.mod h1:dfQVRapGsX6fK8lwGWsCaoPhSYtWwDqex+loAYG1MUk=
-github.com/photon-storage/go-photon v0.0.0-20221212031634-cf2ed8daf988 h1:fljprbrpTOTLxV1Ea4DvmqLKxI1h9nATcoeCLvg4tdw=
-github.com/photon-storage/go-photon v0.0.0-20221212031634-cf2ed8daf988/go.mod h1:QoBtIZy3/vubFuZfnFy6zjz66fu674LMe0GEHxnjEdg=
 github.com/photon-storage/photon-proto v0.0.0-20221118055653-eca551a11bb6 h1:H08JFWkD+dWbePTSrpOolXysn3fYucTe/zpQgawOPPE=
 github.com/photon-storage/photon-proto v0.0.0-20221118055653-eca551a11bb6/go.mod h1:2ugydRJbn8v57ixOXz3TvC4VVlxL913c5HqmN024B9M=
 github.com/photon-storage/protoc-gen-go-cast v0.0.0-20220806055803-33f2f2094e74 h1:8elipmUC8A6Ezaa4VN/ytQ/XfrfEm5Ee70BAsRRVIQA=
