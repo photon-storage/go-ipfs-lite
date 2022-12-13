@@ -10,9 +10,9 @@ import (
 
 	"github.com/photon-storage/go-common/log"
 	"github.com/photon-storage/go-common/testing/require"
-
-	"github.com/photon-storage/go-photon/depot/ipfs"
 	"github.com/photon-storage/go-photon/testing/wait"
+
+	ipfs "github.com/photon-storage/go-ipfs-lite"
 )
 
 func TestNodePutGetRoundtrip(t *testing.T) {

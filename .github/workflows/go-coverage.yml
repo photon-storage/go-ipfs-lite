@@ -1,0 +1,44 @@
+name: go-coverage
+
+on:
+  schedule:
+    - cron: "0 21 * * *" # every day at 21:00 UTC
+
+defaults:
+  run:
+    # shell default shell to bash for all OS
+    shell: bash
+
+jobs:
+  go-run-coverage:
+    name: go-run-coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: install-go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.18
+
+      - name: checkout-code
+        uses: actions/checkout@v2
+
+      - name: setup-cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            .env
+          key: go-coverage-env
+
+      - name: setup-env
+        run: ./scripts/check_env.sh || make env
+
+      - name: run-test
+        run: sudo sysctl -w net.core.rmem_max=2500000 && go test -timeout=30m -tags develop -coverprofile=profile.out ./... && tail -n +2 profile.out > profile.out.tmp && mv profile.out.tmp profile.out
+
+      - name: report-coverage
+        uses: codecov/codecov-action@v2.1.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
+          files: ./profile.out
+          fail_ci_if_error: true
+          verbose: true

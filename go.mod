@@ -21,11 +21,9 @@ require (
 	github.com/ipfs/go-ipns v0.3.0
 	github.com/ipfs/go-merkledag v0.8.1
 	github.com/ipfs/go-unixfs v0.4.1
-	github.com/ipfs/kubo v0.17.0
+	github.com/ipfs/go-verifcid v0.0.2
 	github.com/libp2p/go-libp2p v0.24.1
-	github.com/libp2p/go-libp2p-core v0.20.1
 	github.com/libp2p/go-libp2p-kad-dht v0.20.0
-	github.com/libp2p/go-libp2p-peerstore v0.8.0
 	github.com/libp2p/go-libp2p-record v0.2.0
 	github.com/multiformats/go-multiaddr v0.8.0
 	github.com/photon-storage/go-common v0.0.0-20221201055738-384fda0f66a0
@@ -69,14 +67,13 @@ require (
 	github.com/ipfs/go-fetcher v1.6.1 // indirect
 	github.com/ipfs/go-ipfs-delay v0.0.1 // indirect
 	github.com/ipfs/go-ipfs-ds-help v1.1.0 // indirect
+	github.com/ipfs/go-ipfs-files v0.2.0 // indirect
 	github.com/ipfs/go-ipfs-pq v0.0.2 // indirect
 	github.com/ipfs/go-ipld-legacy v0.1.1 // indirect
 	github.com/ipfs/go-log v1.0.5 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/ipfs/go-metrics-interface v0.0.1 // indirect
 	github.com/ipfs/go-peertaskqueue v0.8.0 // indirect
-	github.com/ipfs/go-verifcid v0.0.2 // indirect
-	github.com/ipfs/interface-go-ipfs-core v0.7.0 // indirect
 	github.com/ipld/go-codec-dagpb v1.4.1 // indirect
 	github.com/ipld/go-ipld-prime v0.19.0 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
@@ -112,7 +109,6 @@ require (
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b // indirect
 	github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc // indirect
 	github.com/minio/sha256-simd v1.0.0 // indirect
-	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.4.3 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect
