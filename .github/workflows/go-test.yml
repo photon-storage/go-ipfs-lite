@@ -100,9 +100,6 @@ jobs:
           lscpu 2>/dev/null && echo --- || true
           env | sort
 
-      - name: setup-env
-        run: ./scripts/check_env.sh || make env
-
       - name: run-test-on-pr
         if: ${{ github.event_name == 'pull_request' }}
         run: |
