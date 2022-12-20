@@ -333,6 +333,8 @@ const (
 type PutOpts struct {
 	// DataType sets which dag type to generate for the object.
 	DagType DagType
+	// ChunkSize sets the split size for generating DAG leave nodes.
+	ChunkSize int64
 	// Number of linkes per block in DAG.
 	LinksPerBlock int
 	// RawLeaves sets if leaf nodes are generated as RawNode.
@@ -346,10 +348,13 @@ type PutOpts struct {
 func (n *Node) PutObject(
 	ctx context.Context,
 	src any,
-	opts *PutOpts,
+	opts PutOpts,
 ) (ipld.Node, error) {
-	if opts == nil {
-		opts = &PutOpts{}
+	if opts.ChunkSize == 0 {
+		opts.ChunkSize = chunk.DefaultBlockSize
+	}
+	if opts.LinksPerBlock == 0 {
+		opts.LinksPerBlock = defaultLinksPerBlock
 	}
 
 	var dp dataProvider
@@ -359,17 +364,12 @@ func (n *Node) PutObject(
 	case []byte:
 		dp = NewDataProvider(
 			bytes.NewReader(v),
-			chunk.DefaultBlockSize,
+			opts.ChunkSize,
 		)
 	case io.Reader:
-		dp = NewDataProvider(v, chunk.DefaultBlockSize)
+		dp = NewDataProvider(v, opts.ChunkSize)
 	default:
 		return nil, ErrDataSourceTypeNotSupported
-	}
-
-	linksPerBlock := opts.LinksPerBlock
-	if linksPerBlock == 0 {
-		linksPerBlock = defaultLinksPerBlock
 	}
 
 	db := newDagBuilder(
@@ -377,8 +377,8 @@ func (n *Node) PutObject(
 		dp,
 		n.cfg.CidBuilder,
 		n.dserv,
-		opts,
-		linksPerBlock,
+		&opts,
+		opts.LinksPerBlock,
 	)
 
 	var gen func(db *dagBuilder) (*ExtendedNode, error)

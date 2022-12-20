@@ -40,7 +40,7 @@ func TestNodePutGetRoundtrip(t *testing.T) {
 	nd, err := nodeA.PutObject(
 		ctx,
 		bytes.NewReader([]byte(content)),
-		&ipfs.PutOpts{
+		ipfs.PutOpts{
 			DagType:   ipfs.DagBalanced,
 			RawLeaves: false,
 		},
