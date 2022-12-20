@@ -12,7 +12,7 @@ import (
 	"github.com/ipfs/go-merkledag"
 )
 
-// PutOpts contains configurable parameters for file DAG building.
+// CidOpts contains configurable parameters for generating CID.
 type CidOpts struct {
 	// DataType sets which dag type to generate for the object.
 	DagType DagType
@@ -22,11 +22,11 @@ type CidOpts struct {
 	LinksPerBlock int
 	// RawLeaves sets if leaf nodes are generated as RawNode.
 	RawLeaves bool
-	// CidBuilder v1 or v2
+	// CidBuilder v0 or v1. Default to v1.
 	CidBuilder cid.Builder
 }
 
-// GenCid calculates CID for the supplied data.
+// GenCid calculates CID for the given data source.
 func GenCid(
 	ctx context.Context,
 	src any,
