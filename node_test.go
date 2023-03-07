@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	ipfslog "github.com/ipfs/go-log/v2"
+
 	"github.com/photon-storage/go-common/log"
 	"github.com/photon-storage/go-common/testing/require"
 
@@ -19,14 +21,21 @@ func TestNodePutGetRoundtrip(t *testing.T) {
 	// Remove skip to run test.
 	t.Skip()
 
+	ipfslog.SetAllLoggers(ipfslog.LevelWarn)
 	log.Init(log.DebugLevel, log.TextFormat, true)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
-	nodeA, err := ipfs.New(ctx, ipfs.Config{})
+	nodeA, err := ipfs.New(ctx, ipfs.Config{
+		MinConnections: 100,
+		MaxConnections: 200,
+	})
 	require.NoError(t, err)
-	nodeB, err := ipfs.New(ctx, ipfs.Config{})
+	nodeB, err := ipfs.New(ctx, ipfs.Config{
+		MinConnections: 100,
+		MaxConnections: 200,
+	})
 	require.NoError(t, err)
 
 	// Wait 60 seconds for node to initialize.
@@ -34,7 +43,8 @@ func TestNodePutGetRoundtrip(t *testing.T) {
 
 	fmt.Printf("************************* start ********************************\n")
 
-	content := fmt.Sprintf("hello world test at unix nano %v", time.Now().UnixNano())
+	content := fmt.Sprintf("hello world test at unix nano %v",
+		time.Now().UnixNano())
 
 	// Put object.
 	nd, err := nodeA.PutObject(
@@ -47,7 +57,7 @@ func TestNodePutGetRoundtrip(t *testing.T) {
 	)
 	require.NoError(t, err)
 	cid := nd.Cid()
-	fmt.Printf("object uploaded, cid = %v\n", cid)
+	fmt.Printf("Object uploaded, cid = %v\n", cid)
 
 	// Get object.
 	r, err := nodeB.GetObject(ctx, cid)
@@ -57,7 +67,8 @@ func TestNodePutGetRoundtrip(t *testing.T) {
 	data, err := ioutil.ReadAll(r)
 	require.NoError(t, err)
 	require.Equal(t, content, string(data))
-	fmt.Printf("local peer fetched object successfully, content = %v\n", string(data))
+	fmt.Printf("Local peer fetched object successfully, content = %v\n",
+		string(data))
 
 	// Get object through external source.
 	tk := time.NewTicker(10 * time.Millisecond)
@@ -66,6 +77,11 @@ func TestNodePutGetRoundtrip(t *testing.T) {
 	for {
 		select {
 		case <-tk.C:
+			fmt.Printf("Current connection count, node_a = %v, node_b = %v\n",
+				nodeA.NumConns(),
+				nodeB.NumConns(),
+			)
+
 			data, err := ipfs.ExternFetchCid(cid)
 			if err != nil {
 				fmt.Printf("error fetching object from external source: %v\n", err)
