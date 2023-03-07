@@ -56,6 +56,7 @@ type Node struct {
 	ctx      context.Context
 	cancel   context.CancelFunc
 	cfg      Config
+	connMgr  *connmgr.BasicConnMgr
 	host     host.Host
 	disc     mdns.Service
 	dht      *dual.DHT
@@ -80,15 +81,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) {
 	ipld.Register(cid.Raw, merkledag.DecodeRawBlock)
 	ipld.Register(cid.DagCBOR, cbor.DecodeBlock) // need to decode CBOR
 
-	connMgr, err := connmgr.NewConnManager(
-		cfg.MinConnections,
-		cfg.MaxConnections,
-		connmgr.WithGracePeriod(cfg.ConnectionGracePeriod),
-	)
-	if err != nil {
-		return nil, err
-	}
-
+	var connMgr *connmgr.BasicConnMgr
 	var h host.Host
 	var disc mdns.Service
 	var ddht *dual.DHT
@@ -97,6 +90,14 @@ func New(ctx context.Context, cfg Config) (*Node, error) {
 	var reprov provider.Reprovider
 	peerCh := make(chan peer.AddrInfo)
 	if !cfg.OfflineMode {
+		if connMgr, err = connmgr.NewConnManager(
+			cfg.MinConnections,
+			cfg.MaxConnections,
+			connmgr.WithGracePeriod(cfg.ConnectionGracePeriod),
+		); err != nil {
+			return nil, err
+		}
+
 		h, err = libp2p.New(
 			libp2p.Identity(cfg.SecretKey),
 			libp2p.ListenAddrs(cfg.ListenAddrs...),
@@ -211,6 +212,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) {
 		ctx:      ctx,
 		cancel:   cancel,
 		cfg:      cfg,
+		connMgr:  connMgr,
 		host:     h,
 		disc:     disc,
 		dht:      ddht,
@@ -444,4 +446,13 @@ func (n *Node) Exchange() exchange.Interface {
 // BlockService returns the underlying blockservice implementation.
 func (n *Node) BlockService() blockservice.BlockService {
 	return n.bserv
+}
+
+// NumConns returns current connection count.
+func (n *Node) NumConns() int {
+	if n.connMgr == nil {
+		return 0
+	}
+
+	return n.connMgr.GetInfo().ConnCount
 }
