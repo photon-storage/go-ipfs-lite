@@ -28,6 +28,7 @@ func newDiscoveryHandler(ctx context.Context, host host.Host) *discoveryHandler 
 
 func (dh *discoveryHandler) HandlePeerFound(p peer.AddrInfo) {
 	log.Info("Connecting to discovered peer", "peer_id", p.ID)
+
 	ctx, cancel := context.WithTimeout(dh.ctx, discoveryConnTimeout)
 	defer cancel()
 

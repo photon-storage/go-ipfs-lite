@@ -26,11 +26,14 @@ import (
 	"github.com/ipfs/go-ipns"
 	"github.com/ipfs/go-merkledag"
 	ufsio "github.com/ipfs/go-unixfs/io"
+	"github.com/ipfs/kubo/core/bootstrap"
+	"github.com/ipfs/kubo/core/node"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p-kad-dht/dual"
 	record "github.com/libp2p/go-libp2p-record"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	routing "github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
@@ -41,6 +44,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
+	webtransport "github.com/libp2p/go-libp2p/p2p/transport/webtransport"
 
 	"github.com/photon-storage/go-common/log"
 )
@@ -56,7 +60,6 @@ type Node struct {
 	ctx      context.Context
 	cancel   context.CancelFunc
 	cfg      Config
-	connMgr  *connmgr.BasicConnMgr
 	host     host.Host
 	disc     mdns.Service
 	dht      *dual.DHT
@@ -81,7 +84,6 @@ func New(ctx context.Context, cfg Config) (*Node, error) {
 	ipld.Register(cid.Raw, merkledag.DecodeRawBlock)
 	ipld.Register(cid.DagCBOR, cbor.DecodeBlock) // need to decode CBOR
 
-	var connMgr *connmgr.BasicConnMgr
 	var h host.Host
 	var disc mdns.Service
 	var ddht *dual.DHT
@@ -90,20 +92,26 @@ func New(ctx context.Context, cfg Config) (*Node, error) {
 	var reprov provider.Reprovider
 	peerCh := make(chan peer.AddrInfo)
 	if !cfg.OfflineMode {
-		if connMgr, err = connmgr.NewConnManager(
+		connMgr, err := connmgr.NewConnManager(
 			cfg.MinConnections,
 			cfg.MaxConnections,
 			connmgr.WithGracePeriod(cfg.ConnectionGracePeriod),
-		); err != nil {
+		)
+		if err != nil {
 			return nil, err
 		}
 
+		ymtpt := *yamux.DefaultTransport
+		ymtpt.AcceptBacklog = 512
 		h, err = libp2p.New(
 			libp2p.Identity(cfg.SecretKey),
 			libp2p.ListenAddrs(cfg.ListenAddrs...),
 			libp2p.DefaultTransports,
-			libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
-			libp2p.Muxer("/mplex/6.7.0", mplex.DefaultTransport),
+			libp2p.Transport(webtransport.New),
+			libp2p.ChainOptions(
+				libp2p.Muxer("/yamux/1.0.0", &ymtpt),
+				libp2p.Muxer("/mplex/6.7.0", mplex.DefaultTransport),
+			),
 			libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 				var err error
 				ddht, err = dual.New(
@@ -111,10 +119,13 @@ func New(ctx context.Context, cfg Config) (*Node, error) {
 					h,
 					dual.DHTOption(
 						dht.Concurrency(10),
+						dht.BucketSize(20),
 						dht.Mode(dht.ModeAuto),
 						dht.Validator(record.NamespacedValidator{
-							"pk":   record.PublicKeyValidator{},
-							"ipns": ipns.Validator{KeyBook: h.Peerstore()},
+							"pk": record.PublicKeyValidator{},
+							"ipns": ipns.Validator{
+								KeyBook: h.Peerstore(),
+							},
 						}),
 					),
 					dual.WanDHTOption(dht.BootstrapPeers(cfg.Bootstrappers...)),
@@ -122,8 +133,12 @@ func New(ctx context.Context, cfg Config) (*Node, error) {
 				return ddht, err
 			}),
 			libp2p.ConnectionManager(connMgr),
-			libp2p.Security(libp2ptls.ID, libp2ptls.New),
-			libp2p.Security(noise.ID, noise.New),
+			// TODO(kmax): make resource limit configurable thorugh config.
+			libp2p.ResourceManager(&network.NullResourceManager{}),
+			libp2p.ChainOptions(
+				libp2p.Security(noise.ID, noise.New),
+				libp2p.Security(libp2ptls.ID, libp2ptls.New),
+			),
 			libp2p.EnableNATService(),
 			libp2p.NATPortMap(),
 			libp2p.EnableRelay(),
@@ -151,9 +166,43 @@ func New(ctx context.Context, cfg Config) (*Node, error) {
 			return nil, err
 		}
 
+		if cfg.ConnectionLogging {
+			var peers sync.Map
+			h.Network().Notify(
+				&network.NotifyBundle{
+					ConnectedF: func(_ network.Network, conn network.Conn) {
+						pid := conn.RemotePeer()
+						peers.Store(pid, time.Now())
+						log.Debug("Peer connected",
+							"peer", pid,
+							"active", len(h.Network().Peers()),
+						)
+					},
+					DisconnectedF: func(_ network.Network, conn network.Conn) {
+						pid := conn.RemotePeer()
+						t, ok := peers.LoadAndDelete(pid)
+						if !ok {
+							log.Debug("Peer disconnected",
+								"peer", pid,
+								"active", len(h.Network().Peers()),
+							)
+							return
+						}
+
+						start := t.(time.Time)
+						log.Debug("Peer disconnected",
+							"peer", pid,
+							"active", len(h.Network().Peers()),
+							"period", time.Since(start),
+						)
+					},
+				},
+			)
+		}
+
 		disc = mdns.NewMdnsService(
 			h,
-			"",
+			mdns.ServiceName,
 			newDiscoveryHandler(ctx, h),
 		)
 
@@ -162,6 +211,17 @@ func New(ctx context.Context, cfg Config) (*Node, error) {
 			ctx,
 			bsnetwork.NewFromIpfsHost(h, ddht),
 			cfg.Blockstore,
+			bitswap.ProvideEnabled(true),
+			bitswap.ProviderSearchDelay(
+				node.DefaultProviderSearchDelay),
+			bitswap.EngineBlockstoreWorkerCount(
+				node.DefaultEngineBlockstoreWorkerCount),
+			bitswap.TaskWorkerCount(
+				node.DefaultTaskWorkerCount),
+			bitswap.EngineTaskWorkerCount(
+				node.DefaultEngineTaskWorkerCount),
+			bitswap.MaxOutstandingBytesPerPeer(
+				node.DefaultMaxOutstandingBytesPerPeer),
 		)
 
 		// Provider & reprovider.
@@ -208,11 +268,11 @@ func New(ctx context.Context, cfg Config) (*Node, error) {
 
 	// Blockservice.
 	bserv := blockservice.NewWriteThrough(cfg.Blockstore, exch)
+
 	n := &Node{
 		ctx:      ctx,
 		cancel:   cancel,
 		cfg:      cfg,
-		connMgr:  connMgr,
 		host:     h,
 		disc:     disc,
 		dht:      ddht,
@@ -271,6 +331,7 @@ func (n *Node) feedRelayPeers(peerCh chan peer.AddrInfo) {
 
 		closestPeers, err := n.dht.WAN.GetClosestPeers(n.ctx, n.host.ID().String())
 		if err != nil {
+			log.Error("Error finding closest peers", "error", err)
 			// no-op: usually 'failed to find any peer in table' during startup
 			continue
 		}
@@ -279,6 +340,7 @@ func (n *Node) feedRelayPeers(peerCh chan peer.AddrInfo) {
 		for _, pid := range closestPeers {
 			addrs := n.host.Peerstore().Addrs(pid)
 			if len(addrs) == 0 {
+				log.Error("No address found for pid", "pid", pid)
 				continue
 			}
 
@@ -292,36 +354,27 @@ func (n *Node) feedRelayPeers(peerCh chan peer.AddrInfo) {
 		}
 
 		if feeded > 0 {
-			log.Info("new relay peers added", "count", feeded)
+			log.Info("New relay peers added", "count", feeded)
 		}
 	}
 }
 
-// bootstrap builds connections to configured bootstrappers and bootstrap
-// the Peer DHT (and Bitswap). This is a best-effort function.
+// Schedule periodic bootstrapping process which gets triggered when
+// the number of peers is running low.
 func (n *Node) bootstrap() {
-	var wg sync.WaitGroup
-	wg.Add(len(n.cfg.Bootstrappers))
-	for _, pinfo := range n.cfg.Bootstrappers {
-		go func(pinfo peer.AddrInfo) {
-			defer wg.Done()
-
-			if err := n.host.Connect(n.ctx, pinfo); err != nil {
-				log.Warn("error connecting to peer", "error", err)
-				return
-			}
-
-			log.Info("connected bootstrapper", "peer", pinfo.ID)
-		}(pinfo)
+	cfg := bootstrap.DefaultBootstrapConfig
+	cfg.BootstrapPeers = func() []peer.AddrInfo {
+		return n.cfg.Bootstrappers
 	}
-
-	wg.Wait()
-
-	log.Info("bootstrapping done", "num_peers", len(n.host.Network().Peers()))
-
-	if err := n.dht.Bootstrap(n.ctx); err != nil {
-		log.Error("error bootstraping DHT", "error", err)
+	if _, err := bootstrap.Bootstrap(
+		n.host.ID(),
+		n.host,
+		n.dht,
+		cfg,
+	); err != nil {
+		log.Error("Error bootstraping DHT", "error", err)
 	}
+	log.Info("Periodic bootstrapping scheduled")
 }
 
 type DagType int
@@ -448,11 +501,7 @@ func (n *Node) BlockService() blockservice.BlockService {
 	return n.bserv
 }
 
-// NumConns returns current connection count.
-func (n *Node) NumConns() int {
-	if n.connMgr == nil {
-		return 0
-	}
-
-	return n.connMgr.GetInfo().ConnCount
+// NumPeers returns the number of peers the IPFS host is connected to.
+func (n *Node) NumPeers() int {
+	return len(n.host.Network().Peers())
 }
