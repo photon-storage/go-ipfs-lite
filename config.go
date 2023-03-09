@@ -29,6 +29,7 @@ type Config struct {
 	Blockstore            blockstore.Blockstore
 	ReprovideInterval     time.Duration
 	CidBuilder            cid.Builder
+	ConnectionLogging     bool
 }
 
 func fillConfigDefaults(ctx context.Context, c Config) (Config, error) {
@@ -47,7 +48,6 @@ func fillConfigDefaults(ctx context.Context, c Config) (Config, error) {
 			"/ip6/::/tcp/0",
 			"/ip6/::/udp/0/quic",
 		} {
-
 			maddr, err := multiaddr.NewMultiaddr(addr)
 			if err != nil {
 				return Config{}, err

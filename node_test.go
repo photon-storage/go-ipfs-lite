@@ -41,7 +41,7 @@ func TestNodePutGetRoundtrip(t *testing.T) {
 	// Wait 60 seconds for node to initialize.
 	time.Sleep(60 * time.Second)
 
-	fmt.Printf("************************* start ********************************\n")
+	log.Warn("******************** start ***************************")
 
 	content := fmt.Sprintf("hello world test at unix nano %v",
 		time.Now().UnixNano())
@@ -57,7 +57,7 @@ func TestNodePutGetRoundtrip(t *testing.T) {
 	)
 	require.NoError(t, err)
 	cid := nd.Cid()
-	fmt.Printf("Object uploaded, cid = %v\n", cid)
+	log.Info("Object uploaded", "cid", cid)
 
 	// Get object.
 	r, err := nodeB.GetObject(ctx, cid)
@@ -67,8 +67,8 @@ func TestNodePutGetRoundtrip(t *testing.T) {
 	data, err := ioutil.ReadAll(r)
 	require.NoError(t, err)
 	require.Equal(t, content, string(data))
-	fmt.Printf("Local peer fetched object successfully, content = %v\n",
-		string(data))
+	log.Info("Local peer fetched object successfully",
+		"content", string(data))
 
 	// Get object through external source.
 	tk := time.NewTicker(10 * time.Millisecond)
@@ -77,24 +77,77 @@ func TestNodePutGetRoundtrip(t *testing.T) {
 	for {
 		select {
 		case <-tk.C:
-			fmt.Printf("Current connection count, node_a = %v, node_b = %v\n",
-				nodeA.NumConns(),
-				nodeB.NumConns(),
-			)
-
 			data, err := ipfs.ExternFetchCid(cid)
 			if err != nil {
-				fmt.Printf("error fetching object from external source: %v\n", err)
+				log.Error("Error fetching object from external source",
+					"error", err)
 				time.Sleep(10 * time.Second)
 				break
 			}
 
 			if content != string(data) {
-				fmt.Printf("object data from external source mismatch: %v\n", string(data))
+				log.Error("Object data from external source mismatch",
+					"data", string(data))
 				time.Sleep(10 * time.Second)
 				break
 			}
 			return
+
+		case <-ctx.Done():
+			require.Fail(t, "Expected data not fetched before deadline")
+		}
+	}
+}
+
+func TestNodeContinuousPut(t *testing.T) {
+	// Remove skip to run test.
+	t.Skip()
+
+	ipfslog.SetAllLoggers(ipfslog.LevelError)
+	log.Init(log.DebugLevel, log.TextFormat, true)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+
+	nodeA, err := ipfs.New(ctx, ipfs.Config{
+		MinConnections:    100,
+		MaxConnections:    800,
+		ConnectionLogging: true,
+	})
+	require.NoError(t, err)
+
+	log.Warn("******************** start ***************************")
+
+	go func() {
+		putTicker := time.NewTicker(60 * time.Second)
+		for {
+			select {
+			case <-putTicker.C:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	tk := time.NewTicker(10 * time.Second)
+	defer tk.Stop()
+	for {
+		select {
+		case <-tk.C:
+			content := fmt.Sprintf("hello world test at unix nano %v",
+				time.Now().UnixNano())
+
+			// Put object.
+			nd, err := nodeA.PutObject(
+				ctx,
+				bytes.NewReader([]byte(content)),
+				ipfs.PutOpts{
+					DagType:   ipfs.DagBalanced,
+					RawLeaves: false,
+				},
+			)
+			require.NoError(t, err)
+			log.Info("Object uploaded", "cid", nd.Cid())
 
 		case <-ctx.Done():
 			require.Fail(t, "Expected data not fetched before deadline")
